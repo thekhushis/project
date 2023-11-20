@@ -1,0 +1,76 @@
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+import twitter4j.*;
+import twitter4j.auth.AccessToken;
+import twitter4j.auth.OAuthAuthorization;
+import twitter4j.auth.OAuthSupport;
+
+public class TwitterClient {
+
+    private Twitter twitter;
+
+    public TwitterClient() {
+        String consumerKey = "XXXXXXXXXXXXXXXXXXXXXXXX";
+        String consumerSecret = "XXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+        String accessToken = "XXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+        String accessTokenSecret = "XXXXXXXXXXXXXXXXXXXXXXXXX";
+
+        try {
+            OAuthSupport oauthSupport = new OAuthAuthorization(new ConfigurationBuilder().build());
+            AccessToken token = new AccessToken(accessToken, accessTokenSecret);
+            twitter = new TwitterFactory().getInstance(oauthSupport);
+            twitter.setOAuthConsumer(consumerKey, consumerSecret);
+            twitter.setOAuthAccessToken(token);
+        } catch (TwitterException e) {
+            System.out.println("Error: Authentication Failed");
+        }
+    }
+
+    private String cleanTweet(String tweet) {
+        String regex = "(@[A-Za-z0-9]+)|([^0-9A-Za-z \\t])|(\\w+:\\/\\/\\S+)";
+        return tweet.replaceAll(regex, " ").trim();
+    }
+
+    private String getTweetSentiment(String tweet) {
+        String cleanTweet = cleanTweet(tweet);
+        TextBlob analysis = new TextBlob(cleanTweet);
+
+        if (analysis.sentiment().polarity() > 0) {
+            return "positive";
+        } else if (analysis.sentiment().polarity() == 0) {
+            return "neutral";
+        } else {
+            return "negative";
+        }
+    }
+
+    public List<Tweet> getTweets(String query, int count) {
+        List<Tweet> tweets = new ArrayList<>();
+
+        try {
+            Query twitterQuery = new Query(query);
+            twitterQuery.setCount(count);
+
+            QueryResult result = twitter.search(twitterQuery);
+            List<Status> statusList = result.getTweets();
+
+            for (Status status : statusList) {
+                Tweet tweet = new Tweet();
+                tweet.setText(status.getText());
+                tweet.setSentiment(getTweetSentiment(status.getText()));
+
+                if (status.getRetweetCount() > 0) {
+                    if (!tweets.contains(tweet)) {
+                        tweets.add(tweet);
+                    }
+                } else {
+                    tweets.add(tweet);
+                }
+            }
+        } catch (TwitterException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+
+        return tweets;
+    }
